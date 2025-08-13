@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HelloCubic Settings</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 24px auto; padding: 0 12px; }
+    header { display:flex; justify-content:space-between; align-items:center; }
+    section { border:1px solid #ddd; border-radius:12px; padding:16px; margin:16px 0; }
+    label { display:block; font-weight:600; margin-top:8px; }
+    input,select,button { padding:8px; border-radius:8px; border:1px solid #ccc; width:100%; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    code { background:#f7f7f7; padding:2px 6px; border-radius:6px; }
+  </style>
+</head>
+<body>
+<header>
+  <h2>HelloCubic</h2>
+  <a href="/update">OTA Update</a>
+</header>
+
+<section>
+  <h3>Thời gian</h3>
+  <div class="row">
+    <div>
+      <label>Múi giờ (TZ POSIX)</label>
+      <input id="tz" placeholder="ICT-7">
+      <small>Ví dụ: <code>ICT-7</code> (UTC+7), <code>UTC0</code>, <code>JST-9</code></small>
+    </div>
+    <div>
+      <label>NTP Server</label>
+      <input id="ntp" placeholder="pool.ntp.org">
+    </div>
+  </div>
+  <button onclick="save()">Lưu</button>
+</section>
+
+<section>
+  <h3>Giờ hiện tại</h3>
+  <pre id="now">Loading...</pre>
+</section>
+
+<section>
+  <h3>LittleFS</h3>
+  <form id="up" enctype="multipart/form-data" method="post" action="/fs/upload">
+    <input type="file" name="file">
+    <button type="submit">Upload</button>
+  </form>
+  <div id="files"></div>
+</section>
+
+<script>
+async function load() {
+  let cfg = await (await fetch('/config.json')).json();
+  tz.value = cfg.timezone || 'ICT-7';
+  ntp.value = cfg.ntp || 'pool.ntp.org';
+  listFiles();
+  tick();
+}
+async function save() {
+  let body = JSON.stringify({ timezone: tz.value, ntp: ntp.value });
+  let r = await fetch('/config.json', { method: 'PUT', body });
+  alert(r.ok ? 'Đã lưu' : 'Lỗi');
+}
+async function tick() {
+  let t = await (await fetch('/time.json')).json();
+  now.textContent = JSON.stringify(t, null, 2);
+  setTimeout(tick, 1000);
+}
+async function listFiles() {
+  let arr = await (await fetch('/fs/list')).json();
+  files.innerHTML = '<ul>' + arr.map(f => `<li>${f.name} (${f.size}B) <button onclick="delFile('${f.name}')">Xóa</button></li>`).join('') + '</ul>';
+}
+async function delFile(p) {
+  let r = await fetch('/fs/delete?path=' + encodeURIComponent(p), { method: 'DELETE' });
+  if (r.ok) listFiles();
+}
+load();
+</script>
+</body>
+</html>
